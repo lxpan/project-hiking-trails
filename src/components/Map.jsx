@@ -1,9 +1,11 @@
 import React, { useRef, useEffect, useState } from 'react';
 import bbox from '@turf/bbox';
+import setAllLayersVisibility from '../utils/utils';
 import { useAppState } from '../overmind';
 import mapboxgl from '!mapbox-gl'; // eslint-disable-line import/no-webpack-loader-syntax
 import 'mapbox-gl/dist/mapbox-gl.css';
 import '../styles/Map.css';
+import { convertLength } from '@turf/turf';
 
 mapboxgl.accessToken =
     'pk.eyJ1IjoibHBhbmRldiIsImEiOiJjbGdlZnFvNDEwdTF0M3JyeW5nNjF0bHg2In0.FeOaetmAXx5D4hb1A4e-hg';
@@ -18,14 +20,21 @@ const COLOURS = [
     palette.red[500],
 ];
 
+const INITIAL_LNG = 143.9221;
+const INITIAL_LAT = -37.655;
+const ZOOM = 13.2;
+
 function Map() {
     const { routes } = useAppState();
 
     const mapContainer = useRef(null);
     const map = useRef(null);
-    const [lng, setLng] = useState(143.9221);
-    const [lat, setLat] = useState(-37.655);
-    const [zoom, setZoom] = useState(13.2);
+    const [lng, setLng] = useState(INITIAL_LNG);
+    const [lat, setLat] = useState(INITIAL_LAT);
+    const [zoom, setZoom] = useState(ZOOM);
+
+    const [stateMap, setStateMap] = useState(null);
+    const [currentRoute, setCurrentRoute] = useState(null);
 
     // initialise the map right after component load
     useEffect(() => {
@@ -43,6 +52,7 @@ function Map() {
             map.current.resize();
             routes.forEach((route) => {
                 const { slug } = route;
+
                 // 1. Add the source using the slug as unique id
                 map.current.addSource(slug, {
                     type: 'geojson',
@@ -86,6 +96,7 @@ function Map() {
                     map.current.setPaintProperty(slug, 'line-width', 4);
                 });
 
+                // Pan to route (bounding box) on click
                 map.current.on('click', `${slug}-fill`, () => {
                     const bounds = bbox(route.geoJson);
 
@@ -93,9 +104,13 @@ function Map() {
                     map.current.fitBounds(bounds, {
                         padding: 20,
                     });
+
+                    setCurrentRoute(slug);
                 });
             });
         });
+
+        setStateMap(map);
     });
 
     // store new coordinates as user moves the map
@@ -107,6 +122,45 @@ function Map() {
             setZoom(map.current.getZoom().toFixed(2));
         });
     });
+
+    useEffect(() => {
+        if (currentRoute && stateMap.current) {
+            routes.forEach((route) => {
+                const { slug } = route;
+                // set currently selected route visible and pan to route
+                if (slug === currentRoute) {
+                    setAllLayersVisibility(stateMap.current, slug, 'visible');
+                    const bounds = bbox(route.geoJson);
+                    // pan map to bounds
+                    stateMap.current.fitBounds(bounds, {
+                        padding: 20,
+                    });
+                }
+                // hide all other routes on the map
+                else {
+                    setAllLayersVisibility(stateMap.current, slug, 'none');
+                }
+            });
+        }
+        else {
+            // Reset initial map state
+            routes.forEach((route) => {
+                const { slug } = route;
+                if (stateMap.current) {
+                    setAllLayersVisibility(stateMap.current, slug, 'visible');
+                    stateMap.current.flyTo({
+                        center: [INITIAL_LNG, INITIAL_LAT],
+                        essential: true,
+                        zoom,
+                    });
+                }
+            });
+        }
+    }, [currentRoute, stateMap]);
+
+    // useEffect(() => {
+    //     console.log(stateMap);
+    // }, [stateMap]);
 
     return (
         <>
