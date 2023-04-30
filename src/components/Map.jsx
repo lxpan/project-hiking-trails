@@ -40,7 +40,7 @@ function Map() {
     useEffect(() => {
         // console.log('routes state in Map component');
         // console.log(routes);
-        if (map.current) return; // initialize map only once
+        // if (map.current) return; // initialize map only once
         map.current = new mapboxgl.Map({
             container: mapContainer.current,
             style: 'mapbox://styles/mapbox/outdoors-v11',
@@ -108,10 +108,14 @@ function Map() {
                     setCurrentRoute(slug);
                 });
             });
+
+            // Save map in state
+            setStateMap(map);
         });
 
-        setStateMap(map);
-    });
+        // Returns a "cleanup" arrow function to remove map
+        return () => map.current.remove();
+    }, []);
 
     // store new coordinates as user moves the map
     useEffect(() => {
@@ -146,7 +150,7 @@ function Map() {
             // Reset initial map state
             routes.forEach((route) => {
                 const { slug } = route;
-                if (stateMap.current) {
+                if (stateMap) {
                     setAllLayersVisibility(stateMap.current, slug, 'visible');
                     stateMap.current.flyTo({
                         center: [INITIAL_LNG, INITIAL_LAT],
@@ -158,9 +162,9 @@ function Map() {
         }
     }, [currentRoute, stateMap]);
 
-    // useEffect(() => {
-    //     console.log(stateMap);
-    // }, [stateMap]);
+    useEffect(() => {
+        console.log(stateMap);
+    }, [stateMap]);
 
     return (
         <>
